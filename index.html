@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>مساعد اتخاذ القرار — إدخال</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 18px; background:#f7f9fc; color:#111; }
+    .container { max-width:900px; margin:auto; background:white; padding:18px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+    h1 { margin-top:0; }
+    label { display:block; margin-top:12px; font-weight:600; }
+    input[type="text"], textarea, select { width:100%; padding:8px; margin-top:6px; border:1px solid #ddd; border-radius:6px; resize:vertical; }
+    .row { display:flex; gap:8px; margin-top:8px; }
+    .col { flex:1; }
+    button { margin-top:12px; padding:10px 14px; border:none; border-radius:6px; background:#007bff; color:white; cursor:pointer; }
+    .muted { color:#666; font-size:0.95em; margin-top:6px; }
+    .alt-list { margin-top:8px; }
+    .alt-item { display:flex; gap:8px; margin-bottom:6px; }
+    .alt-item input { flex:1; }
+    .small { font-size:0.9em; padding:6px 10px; background:#eee; border-radius:6px; border:1px solid #ddd; cursor:pointer; }
+    .advanced { margin-top:12px; background:#fbfcfe; padding:10px; border-radius:6px; border:1px dashed #e1e6f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>مساعد اتخاذ القرار</h1>
+    <p class="muted">املأ بيانات القرار ثم اضغط "عرض وتحليل" للذهاب إلى اللوحة التفاعلية. يمكنك إضافة بدائل، وتحديد إطار زمني وميزانية مختصرة.</p>
+
+    <label>الموضوع</label>
+    <input id="topic" type="text" placeholder="مثال: اختيار وظيفة جديدة" required>
+
+    <label>الصعوبات / القيود (موجز)</label>
+    <textarea id="difficulties" rows="3" placeholder="مثال: قلة وقت، ميزانية محدودة"></textarea>
+
+    <label>الأدوات المتاحة</label>
+    <textarea id="tools" rows="2" placeholder="مثال: إنترنت، شبكة علاقات، ميزانية صغيرة"></textarea>
+
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <div style="flex:1">
+        <label>الإطار الزمني</label>
+        <select id="timeframe">
+          <option value="immediate">فوري / أسابيع</option>
+          <option value="1-3 months">1–3 أشهر</option>
+          <option value="3-12 months">3–12 أشهر</option>
+          <option value="12+ months">سنة أو أكثر</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <label>الميزانية</label>
+        <select id="budget">
+          <option value="none">لا تكلفة</option>
+          <option value="low">منخفضة</option>
+          <option value="medium">متوسطة</option>
+          <option value="high">عالية</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="advanced">
+      <label>البدائل (أضف 2–6 بدائل)</label>
+      <div id="altContainer" class="alt-list"></div>
+      <div style="display:flex; gap:8px;">
+        <input id="newAlt" type="text" placeholder="أدخل اسم بديل ثم اضغط +">
+        <button type="button" class="small" onclick="addAlt()">+ إضافة</button>
+        <button type="button" class="small" onclick="fillExamples()">✦ أمثلة سريعة</button>
+      </div>
+      <div class="muted">يمكنك ترك البدائل فارغة وسيتم توليد اقتراحات عامة على الصفحة التالية.</div>
+    </div>
+
+    <label style="margin-top:14px;">مستوى التفاصيل المطلوب في الحلول</label>
+    <select id="detailLevel">
+      <option value="summary">موجز</option>
+      <option value="detailed">تفصيلي</option>
+      <option value="step-by-step">خطة خطوة بخطوة</option>
+    </select>
+
+    <div style="display:flex; gap:8px;">
+      <button onclick="goToResults()">عرض وتحليل</button>
+      <button type="button" onclick="saveTemplate()" style="background:#28a745">حفظ كقالب</button>
+    </div>
+
+    <p class="muted" style="margin-top:12px;">نظام: data يتم تضمينها في رابط المشاركة على الصفحة التالية (لا حاجة لسيرفر).</p>
+  </div>
+
+  <script>
+    // إدارة البدائل محلياً
+    const altContainer = document.getElementById('altContainer');
+
+    function addAlt(name) {
+      const val = name || document.getElementById('newAlt').value.trim();
+      if (!val) return;
+      const id = 'alt_' + Date.now();
+      const div = document.createElement('div');
+      div.className = 'alt-item';
+      div.id = id;
+      div.innerHTML = `<input value="${escapeHtml(val)}"><button onclick="removeAlt('${id}')" class="small">حذف</button>`;
+      altContainer.appendChild(div);
+      document.getElementById('newAlt').value = '';
+    }
+
+    function removeAlt(id) { const el = document.getElementById(id); if (el) el.remove(); }
+
+    function fillExamples() {
+      const examples = ['البديل أ: قبول العرض الحالي', 'البديل ب: البحث عن عمل آخر', 'البديل ج: تطوير مهارة واحتفاظ بالوظيفة'];
+      examples.forEach(e => addAlt(e));
+    }
+
+    function getAlternatives() {
+      const inputs = altContainer.querySelectorAll('input');
+      const arr = [];
+      inputs.forEach(i => { if (i.value.trim()) arr.push(i.value.trim()); });
+      return arr;
+    }
+
+    function goToResults() {
+      const state = {
+        topic: document.getElementById('topic').value || '',
+        difficulties: document.getElementById('difficulties').value || '',
+        tools: document.getElementById('tools').value || '',
+        timeframe: document.getElementById('timeframe').value,
+        budget: document.getElementById('budget').value,
+        detailLevel: document.getElementById('detailLevel').value,
+        alternatives: getAlternatives()
+      };
+      const encoded = encodeState(state);
+      window.location.href = `results.html?state=${encoded}`;
+    }
+
+    function encodeState(obj) {
+      const s = JSON.stringify(obj);
+      // handle Unicode safely
+      return btoa(unescape(encodeURIComponent(s)));
+    }
+
+    function saveTemplate() {
+      const state = {
+        topic: document.getElementById('topic').value || '',
+        difficulties: document.getElementById('difficulties').value || '',
+        tools: document.getElementById('tools').value || '',
+        timeframe: document.getElementById('timeframe').value,
+        budget: document.getElementById('budget').value,
+        detailLevel: document.getElementById('detailLevel').value,
+        alternatives: getAlternatives()
+      };
+      localStorage.setItem('decision_template', JSON.stringify(state));
+      alert('تم حفظ القالب محلياً. يمكنك استرجاعه في جلسة المتصفح هذه.');
+    }
+
+    function escapeHtml(txt){ return txt.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  </script>
+</body>
+</html>
