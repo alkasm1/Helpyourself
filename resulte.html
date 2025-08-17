@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>الحلول المقترحة</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+        #results { max-width: 600px; margin: auto; text-align: right; }
+        ol { list-style-type: decimal; padding-right: 20px; }
+        li { margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <h1>الحلول المقترحة</h1>
+    <div id="results"></div>
+    <a href="index.html">عودة إلى الصفحة الرئيسية</a>
+    
+    <script>
+        // قراءة المدخلات من الـ URL
+        const params = new URLSearchParams(window.location.search);
+        const topic = decodeURIComponent(params.get('topic') || 'غير محدد');
+        const difficulties = decodeURIComponent(params.get('difficulties') || 'غير محدد');
+        const tools = decodeURIComponent(params.get('tools') || 'غير محدد');
+        
+        // وظيفة محاكاة لتوليد حلول بسيطة (يمكن تخصيصها بناءً على المدخلات)
+        function generateSuggestions() {
+            // مثال: حلول ثابتة، مع بعض التخصيص بناءً على كلمات مفتاحية
+            let suggestions = [
+                { title: 'الحل الأول (الأمثل)', description: 'ابدأ بتحليل الصعوبات مثل ' + difficulties + ' باستخدام ' + tools + '.' },
+                { title: 'الحل الثاني', description: 'استشر خبيرًا إذا كان الموضوع ' + topic + ' يتطلب مساعدة خارجية.' },
+                { title: 'الحل الثالث', description: 'قسم المهمة إلى خطوات صغيرة لتجنب الصعوبات.' },
+                { title: 'الحل الرابع', description: 'استخدم أدوات إضافية إذا لزم الأمر.' },
+                { title: 'الحل الخامس', description: 'تقييم النتائج بعد التنفيذ.' }
+            ];
+            
+            // تخصيص بسيط: إذا احتوت الصعوبات على "وقت"، غير الحل الأول
+            if (difficulties.includes('وقت')) {
+                suggestions[0].description = 'ركز على إدارة الوقت باستخدام ' + tools + ' للموضوع ' + topic + '.';
+            }
+            
+            return suggestions;
+        }
+        
+        // عرض النتائج
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `<p>بناءً على: <strong>${topic}</strong> (الصعوبات: ${difficulties}، الأدوات: ${tools})</p><h2>الحلول المرتبة:</h2><ol>`;
+        const sugs = generateSuggestions();
+        sugs.forEach(sug => {
+            resultsDiv.innerHTML += `<li><strong>${sug.title}</strong>: ${sug.description}</li>`;
+        });
+        resultsDiv.innerHTML += '</ol>';
+    </script>
+</body>
+</html>
