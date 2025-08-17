@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>مساعد اتخاذ القرار — لوحة التحليل</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin:18px; background:#f2f6fb; color:#111; }
+    .wrap { max-width:1100px; margin:auto; display:grid; grid-template-columns: 1fr 420px; gap:16px; }
+    .card { background:white; padding:12px; border-radius:8px; box-shadow:0 1px 6px rgba(20,30,60,0.06); }
+    h2 { margin:6px 0 12px; }
+    .smallmuted { color:#666; font-size:0.95em; }
+    .alt-row { display:flex; align-items:center; gap:10px; border-bottom:1px dashed #eee; padding:8px 0; }
+    .alt-title { font-weight:700; min-width:140px; }
+    .score-badge { background:#007bff; color:white; padding:6px 10px; border-radius:6px; font-weight:700; width:86px; text-align:center; }
+    .criteria { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
+    .criterion { background:#fafbff; padding:8px; border-radius:8px; border:1px solid #e6e9fb; flex:1; }
+    input[type="range"] { width:100%; }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .btn { padding:8px 12px; border-radius:6px; border:none; background:#007bff; color:white; cursor:pointer; }
+    .btn.secondary { background:#6c757d; }
+    .btn.ghost { background:transparent; border:1px solid #ddd; color:#333; }
+    .share { word-break:break-all; font-size:0.9em; color:#0a58ca; }
+    @media (max-width:900px){ .wrap { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div style="max-width:1100px;margin:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h1>لوحة القرار التفاعلية</h1>
+      <div>
+        <button class="btn" onclick="copyShare()">نسخ رابط المشاركة</button>
+        <button class="btn secondary" onclick="exportJSON()">تصدير JSON</button>
+        <button class="btn ghost" onclick="window.print()">طباعة</button>
+      </div>
+    </div>
+    <p class="smallmuted">يمكن تعديل التقديرات والأوزان لمشاهدة كيف يتغير ترتيب البدائل (تحليل الحساسية).</p>
+
+    <div class="wrap">
+      <!-- اللوحة اليسرى: البدائل وتفاصيل كل -->
+      <div class="card" id="mainCard">
+        <h2 id="topicTitle">الموضوع</h2>
+        <div id="meta" class="smallmuted"></div>
+
+        <div style="margin-top:12px;">
+          <h3>المعايير (اضبط الأوزان)</h3>
+          <div id="criteriaList" class="criteria"></div>
+          <div class="smallmuted" style="margin-top:6px;">الأوزان ستُعادطبعياً لتكون مجموعها 100%.</div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <h3>البدائل وتقديراتها</h3>
+          <div id="alternatives"></div>
+        </div>
+      </div>
+
+      <!-- اللوحة اليمنى: النتائج وترتيب -->
+      <div class="card">
+        <h2>النتيجة — الترتيب</h2>
+        <div id="ranking"></div>
+
+        <h3 style="margin-top:12px;">رابط المشاركة (حفظ الحالة)</h3>
+        <div id="shareLink" class="share">— لا شيء —</div>
+        <div style="margin-top:8px;" class="smallmuted">الرابط يحتوي كامل حالة اللوحة ويمكن فتحه لاحقًا أو مشاركته.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // فائدة: فكّ تشفير state من العنوان
+    function getStateFromURL() {
+      const params = new URLSearchParams(location.search);
+      const s = params.get('state');
+      if (!s) return null;
+      try {
+        const json = decodeURIComponent(escape(atob(s)));
+        return JSON.parse(json);
+      } catch (e) { console.error('فشل فك التشفير', e); return null; }
+    }
+
+    // هاش ثابت لإنتاج تقديرات مبدئية متكررة
+    function hashTo01(str, seed=0) {
+      let h = 2166136261 ^ seed;
+      for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 16777619); }
+      h = (h >>> 0) / 4294967295;
+      return h; // 0..1
+    }
+
+    // Default criteria
+    let criteria = [
+      { id:'cost', name:'التكلفة', weight:0.4 },
+      { id:'time', name:'الزمن', weight:0.3 },
+      { id:'quality', name:'الجودة', weight:0.3 }
+    ];
+
+    let state = getStateFromURL() || {
+      topic: 'موضوع تجريبي',
+      difficulties: '',
+      tools: '',
+      timeframe: 'immediate',
+      budget: 'medium',
+      detailLevel: 'summary',
+      alternatives: ['الخيار 1','الخيار 2','الخيار 3']
+    };
+
+    // إنشاء تقديرات مبدئية لكل بديل ولكل معيار
+    function initialEstimates(alts) {
+      const est = {};
+      alts.forEach((alt, idx) => {
+        est[alt] = {};
+        criteria.forEach(c => {
+          // استخدم هاش مع نص alt+topic+criterion للحصول على قيمة متكررة 0..1
+          let base = hashTo01(state.topic + '|' + alt + '|' + c.id, idx*31);
+          // تعديل خفيف حسب الميزانية/القيود
+          if (c.id === 'cost') {
+            if (state.budget === 'none' || state.budget === 'low') base = Math.max(0.2, base - 0.2);
+            if (state.budget === 'high') base = Math.min(0.95, base + 0.15);
+            base = 1 - base; // على معيار التكلفة، قيمة أعلى تعني أقل تكلفة أفضل => عكس
+          }
+          if (c.id === 'time') {
+            if (state.timeframe === 'immediate') base = Math.min(0.95, base + 0.25);
+            if (state.timeframe === '12+ months') base = Math.max(0.05, base - 0.25);
+          }
+          if (c.id === 'quality') {
+            if (state.tools && state.tools.length > 5) base = Math.min(0.95, base + 0.12);
+          }
+          est[alt][c.id] = Math.round(base * 100); // 0..100 for slider
+        });
+      });
+      return est;
+    }
+
+    // Build UI
+    const topicTitle = document.getElementById('topicTitle');
+    const meta = document.getElementById('meta');
+    const criteriaList = document.getElementById('criteriaList');
+    const alternativesDiv = document.getElementById('alternatives');
+    const rankingDiv = document.getElementById('ranking');
+    const shareLinkDiv = document.getElementById('shareLink');
+
+    topicTitle.innerText = state.topic || '—';
+    meta.innerHTML = `<div>الصعوبات: ${escapeHtml(state.difficulties||'—')}</div><div>الأدوات: ${escapeHtml(state.tools||'—')}</div><div>الإطار: ${state.timeframe} • الميزانية: ${state.budget}</div>`;
+
+    let estimates = initialEstimates(state.alternatives);
+
+    // render criteria with weight sliders
+    function renderCriteria() {
+      criteriaList.innerHTML = '';
+      criteria.forEach((c, i) => {
+        const div = document.createElement('div');
+        div.className = 'criterion';
+        div.innerHTML = `<div style="font-weight:700">${c.name}</div>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+            <input type="range" min="0" max="100" value="${Math.round(c.weight*100)}" id="w_${c.id}">
+            <div style="width:56px; text-align:center; font-weight:700;" id="wv_${c.id}">${Math.round(c.weight*100)}%</div>
+          </div>`;
+        criteriaList.appendChild(div);
+        document.getElementById(`w_${c.id}`).addEventListener('input', () => {
+          document.getElementById(`wv_${c.id}`).innerText = document.getElementById(`w_${c.id}`).value + '%';
+          normalizeWeightsFromUI();
+          computeAndRender();
+        });
+      });
+    }
+
+    function normalizeWeightsFromUI() {
+      // أخذ القيم من sliders ثم نطبعها لتصبح مجموع 1
+      const vals = criteria.map(c => parseInt(document.getElementById(`w_${c.id}`).value,10));
+      const s = vals.reduce((a,b)=>a+b,0) || 1;
+      criteria.forEach((c,idx)=>{ c.weight = vals[idx] / s; document.getElementById(`wv_${c.id}`).innerText = Math.round(c.weight*100)+'%'; });
+    }
+
+    // render alternatives with sliders for each criterion
+    function renderAlternatives() {
+      alternativesDiv.innerHTML = '';
+      state.alternatives.forEach((alt) => {
+        const row = document.createElement('div');
+        row.className = 'alt-row';
+        row.innerHTML = `<div style="flex:1">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="alt-title">${escapeHtml(alt)}</div>
+              <div style="display:flex; gap:8px;">
+                <button class="small" onclick="removeAlternative('${escapeForId(alt)}')">✖ حذف</button>
+              </div>
+            </div>
+            <div style="margin-top:8px;" id="sliders_${encodeURIComponent(alt)}"></div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end;">
+            <div class="score-badge" id="badge_${encodeURIComponent(alt)}">0</div>
+            <div class="smallmuted" style="margin-top:6px;">النقاط</div>
+          </div>`;
+        alternativesDiv.appendChild(row);
+
+        // create sliders for each criterion
+        const slidersDiv = document.getElementById(`sliders_${encodeURIComponent(alt)}`);
+        criteria.forEach(c => {
+          const sid = `s_${encodeURIComponent(alt)}_${c.id}`;
+          const p = document.createElement('div');
+          p.style.marginTop = '6px';
+          p.innerHTML = `<div style="display:flex; justify-content:space-between;"><div style="font-weight:600">${c.name}</div><div id="val_${sid}">${estimates[alt][c.id]}</div></div>
+            <input id="${sid}" type="range" min="0" max="100" value="${estimates[alt][c.id]}">`;
+          slidersDiv.appendChild(p);
+          document.getElementById(sid).addEventListener('input', () => {
+            document.getElementById(`val_${sid}`).innerText = document.getElementById(sid).value;
+            computeAndRender();
+          });
+        });
+      });
+    }
+
+    function computeScores() {
+      // compute total score for each alternative
+      const results = [];
+      state.alternatives.forEach(alt => {
+        let total = 0;
+        criteria.forEach(c => {
+          const sid = `s_${encodeURIComponent(alt)}_${c.id}`;
+          const val = parseInt(document.getElementById(sid).value,10) / 100; // 0..1
+          total += c.weight * val;
+        });
+        results.push({ alt, score: Math.round(total*10000)/100 }); // percent with 2 decimals
+      });
+      // sort descending
+      results.sort((a,b)=>b.score - a.score);
+      return results;
+    }
+
+    function computeAndRender() {
+      const ranked = computeScores();
+      // update badges
+      ranked.forEach(r => {
+        const id = `badge_${encodeURIComponent(r.alt)}`;
+        const el = document.getElementById(id);
+        if (el) el.innerText = r.score;
+      });
+      // render ranking panel
+      rankingDiv.innerHTML = '';
+      ranked.forEach((r, idx) => {
+        const div = document.createElement('div');
+        div.style.display='flex'; div.style.justifyContent='space-between'; div.style.padding='6px 4px';
+        div.innerHTML = `<div style="font-weight:700">${idx+1}. ${escapeHtml(r.alt)}</div><div style="font-weight:700">${r.score}</div>`;
+        rankingDiv.appendChild(div);
+      });
+      // update share link
+      updateShareLink();
+    }
+
+    // share / export
+    function currentStateSnapshot() {
+      // read sliders and weights into a serializable state
+      const snap = JSON.parse(JSON.stringify(state));
+      snap.criteria = criteria.map(c => ({ id:c.id, name:c.name, weight: c.weight }));
+      snap.estimates = {};
+      snap.alternatives.forEach(alt => {
+        snap.estimates[alt] = {};
+        criteria.forEach(c => {
+          const sid = `s_${encodeURIComponent(alt)}_${c.id}`;
+          snap.estimates[alt][c.id] = parseInt(document.getElementById(sid).value,10);
+        });
+      });
+      return snap;
+    }
+
+    function encodeSnap(snap) {
+      return btoa(unescape(encodeURIComponent(JSON.stringify(snap))));
+    }
+
+    function updateShareLink() {
+      const snap = currentStateSnapshot();
+      const url = location.origin + location.pathname.replace(/[^/]+$/,'') + 'results.html?state=' + encodeSnap(snap);
+      shareLinkDiv.innerText = url;
+    }
+
+    function copyShare() {
+      const txt = shareLinkDiv.innerText;
+      navigator.clipboard.writeText(txt).then(()=>alert('تم نسخ رابط المشاركة إلى الحافظة.'));
+    }
+
+    function exportJSON() {
+      const snap = currentStateSnapshot();
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(snap, null, 2));
+      const a = document.createElement('a');
+      a.href = dataStr;
+      a.download = (snap.topic||'decision') + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function removeAlternative(encodedAlt) {
+      const alt = decodeURIComponent(encodedAlt);
+      const idx = state.alternatives.indexOf(alt);
+      if (idx>-1) state.alternatives.splice(idx,1);
+      // if removed, re-render everything
+      estimates = initialEstimates(state.alternatives);
+      renderAlternatives();
+      computeAndRender();
+    }
+
+    // helpers
+    function escapeHtml(txt){ return (txt||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function escapeForId(s){ return s.replace(/'/g,"\\'"); }
+
+    // initialize UI
+    renderCriteria();
+    renderAlternatives();
+    normalizeWeightsFromUI();
+    computeAndRender();
+
+    // If state contains estimates already (shared link), use them to set sliders
+    // (When opening a shared link, getStateFromURL() returns the saved snap)
+    (function applyLoadedEstimates(){
+      const loaded = getStateFromURL();
+      if (loaded && loaded.estimates) {
+        // replace state and estimates
+        state = loaded;
+        // if loaded criteria weights exist, apply
+        if (loaded.criteria) {
+          // align criteria list if IDs match, else keep existing names
+          criteria = loaded.criteria.map(c => ({ id:c.id, name:c.name || c.id, weight:c.weight }));
+        }
+        // re-build estimates
+        estimates = loaded.estimates;
+        // render updated UI
+        topicTitle.innerText = state.topic || '—';
+        meta.innerHTML = `<div>الصعوبات: ${escapeHtml(state.difficulties||'—')}</div><div>الأدوات: ${escapeHtml(state.tools||'—')}</div><div>الإطار: ${state.timeframe} • الميزانية: ${state.budget}</div>`;
+        renderCriteria();
+        renderAlternatives();
+        // set slider values from loaded estimates
+        state.alternatives.forEach(alt => {
+          criteria.forEach(c => {
+            const sid = `s_${encodeURIComponent(alt)}_${c.id}`;
+            const el = document.getElementById(sid);
+            if (el && loaded.estimates[alt] && loaded.estimates[alt][c.id] !== undefined) {
+              el.value = loaded.estimates[alt][c.id];
+              const vid = document.getElementById(`val_${sid}`);
+              if (vid) vid.innerText = el.value;
+            }
+          });
+        });
+        // set weights UI
+        criteria.forEach(c => {
+          const wid = document.getElementById(`w_${c.id}`);
+          if (wid) { wid.value = Math.round(c.weight*100); document.getElementById(`wv_${c.id}`).innerText = Math.round(c.weight*100)+'%'; }
+        });
+        normalizeWeightsFromUI();
+        computeAndRender();
+      }
+    })();
+
+  </script>
+</body>
+</html>
