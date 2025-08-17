@@ -2,51 +2,99 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>الحلول المقترحة</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-        #results { max-width: 600px; margin: auto; text-align: right; }
-        ol { list-style-type: decimal; padding-right: 20px; }
-        li { margin-bottom: 15px; }
+        body { background-color: #f8f9fa; padding: 20px; }
+        .results-container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
-    <h1>الحلول المقترحة</h1>
-    <div id="results"></div>
-    <a href="index.html">عودة إلى الصفحة الرئيسية</a>
+    <div class="results-container">
+        <h1 class="text-center mb-4">الحلول المقترحة</h1>
+        <div id="summary" class="mb-4"></div>
+        <div id="results"></div>
+        <div class="text-center mt-4">
+            <a href="index.html" class="btn btn-secondary">عودة إلى الصفحة الرئيسية</a>
+        </div>
+    </div>
     
     <script>
         // قراءة المدخلات من الـ URL
         const params = new URLSearchParams(window.location.search);
         const topic = decodeURIComponent(params.get('topic') || 'غير محدد');
+        const goals = decodeURIComponent(params.get('goals') || 'غير محدد');
         const difficulties = decodeURIComponent(params.get('difficulties') || 'غير محدد');
         const tools = decodeURIComponent(params.get('tools') || 'غير محدد');
+        const budget = parseInt(decodeURIComponent(params.get('budget') || '0'));
+        const timeAvailable = parseInt(decodeURIComponent(params.get('time') || '0'));
         
-        // وظيفة محاكاة لتوليد حلول بسيطة (يمكن تخصيصها بناءً على المدخلات)
+        // عرض ملخص
+        const summaryDiv = document.getElementById('summary');
+        summaryDiv.innerHTML = `
+            <p class="text-muted">بناءً على: <strong>الموضوع: ${topic}</strong>، <strong>الأهداف: ${goals}</strong>، <strong>الصعوبات: ${difficulties}</strong>، <strong>الأدوات: ${tools}</strong>، <strong>الميزانية: ${budget}</strong>، <strong>الوقت: ${timeAvailable} أيام</strong>.</p>
+        `;
+        
+        // وظيفة محاكاة محسنة لتوليد حلول دقيقة أكثر
         function generateSuggestions() {
-            // مثال: حلول ثابتة، مع بعض التخصيص بناءً على كلمات مفتاحية
-            let suggestions = [
-                { title: 'الحل الأول (الأمثل)', description: 'ابدأ بتحليل الصعوبات مثل ' + difficulties + ' باستخدام ' + tools + '.' },
-                { title: 'الحل الثاني', description: 'استشر خبيرًا إذا كان الموضوع ' + topic + ' يتطلب مساعدة خارجية.' },
-                { title: 'الحل الثالث', description: 'قسم المهمة إلى خطوات صغيرة لتجنب الصعوبات.' },
-                { title: 'الحل الرابع', description: 'استخدم أدوات إضافية إذا لزم الأمر.' },
-                { title: 'الحل الخامس', description: 'تقييم النتائج بعد التنفيذ.' }
-            ];
+            let suggestions = [];
             
-            // تخصيص بسيط: إذا احتوت الصعوبات على "وقت"، غير الحل الأول
-            if (difficulties.includes('وقت')) {
-                suggestions[0].description = 'ركز على إدارة الوقت باستخدام ' + tools + ' للموضوع ' + topic + '.';
+            // حل أساسي مخصص بالأهداف
+            suggestions.push({
+                title: 'الحل الأول (الأمثل نحو الهدف)',
+                description: `ركز على تحقيق ${goals} باستخدام ${tools}، مع تجنب ${difficulties}.`
+            });
+            
+            // تخصيص بناءً على الميزانية
+            if (budget < 1000) {
+                suggestions.push({
+                    title: 'الحل الثاني (منخفض التكلفة)',
+                    description: `نظرًا للميزانية المنخفضة (${budget})، جرب حلول مجانية مثل البحث عبر الإنترنت أو استشارة أصدقاء.`
+                });
+            } else {
+                suggestions.push({
+                    title: 'الحل الثاني (مع استثمار)',
+                    description: `مع ميزانية ${budget}، استثمر في أدوات مدفوعة لتسريع العملية نحو ${goals}.`
+                });
             }
+            
+            // تخصيص بناءً على الوقت
+            if (timeAvailable < 7) {
+                suggestions.push({
+                    title: 'الحل الثالث (سريع التنفيذ)',
+                    description: `مع وقت محدود (${timeAvailable} أيام)، ابدأ بخطوات فورية للتغلب على ${difficulties}.`
+                });
+            } else {
+                suggestions.push({
+                    title: 'الحل الثالث (طويل الأمد)',
+                    description: `لديك ${timeAvailable} أيام، لذا خطط خطة مفصلة لتحقيق ${goals} تدريجيًا.`
+                });
+            }
+            
+            // حلول إضافية عامة
+            suggestions.push({
+                title: 'الحل الرابع',
+                description: 'قم بتقييم الخيارات واختيار الأفضل بناءً على ${tools}.'
+            });
+            suggestions.push({
+                title: 'الحل الخامس',
+                description: 'تابع التقدم وعدل إذا لزم الأمر.'
+            });
             
             return suggestions;
         }
         
         // عرض النتائج
         const resultsDiv = document.getElementById('results');
-        resultsDiv.innerHTML = `<p>بناءً على: <strong>${topic}</strong> (الصعوبات: ${difficulties}، الأدوات: ${tools})</p><h2>الحلول المرتبة:</h2><ol>`;
+        resultsDiv.innerHTML = '<h2 class="mb-3">الحلول المرتبة:</h2><ol class="list-group list-group-numbered">';
         const sugs = generateSuggestions();
         sugs.forEach(sug => {
-            resultsDiv.innerHTML += `<li><strong>${sug.title}</strong>: ${sug.description}</li>`;
+            resultsDiv.innerHTML += `
+                <li class="list-group-item">
+                    <strong>${sug.title}</strong>: ${sug.description}
+                </li>
+            `;
         });
         resultsDiv.innerHTML += '</ol>';
     </script>
