@@ -2,39 +2,79 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>مساعد اتخاذ القرار</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-        form { max-width: 600px; margin: auto; }
-        label { display: block; margin-top: 10px; }
-        input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; }
-        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
-        button:hover { background: #0056b3; }
+        body { background-color: #f8f9fa; padding: 20px; }
+        .form-container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .invalid-feedback { display: none; color: red; }
     </style>
 </head>
 <body>
-    <h1>مساعد اتخاذ القرار</h1>
-    <form id="decisionForm">
-        <label>الموضوع:</label>
-        <input type="text" id="topic" required>
-        
-        <label>الصعوبات:</label>
-        <textarea id="difficulties" required></textarea>
-        
-        <label>الأدوات المتاحة:</label>
-        <textarea id="tools" required></textarea>
-        
-        <button type="button" onclick="goToResults()">اقترح الحلول</button>
-    </form>
+    <div class="form-container">
+        <h1 class="text-center mb-4">مساعد اتخاذ القرار</h1>
+        <form id="decisionForm" class="needs-validation" novalidate>
+            <div class="mb-3">
+                <label for="topic" class="form-label">الموضوع:</label>
+                <input type="text" class="form-control" id="topic" placeholder="مثال: اختيار وظيفة جديدة" required>
+                <div class="invalid-feedback">يرجى إدخال الموضوع.</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="goals" class="form-label">الأهداف المرجوة:</label>
+                <textarea class="form-control" id="goals" placeholder="مثال: الحصول على راتب عالي وتوازن عملي" required></textarea>
+                <div class="invalid-feedback">يرجى إدخال الأهداف.</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="difficulties" class="form-label">الصعوبات:</label>
+                <textarea class="form-control" id="difficulties" placeholder="مثال: قلة الوقت، نقص المهارات" required></textarea>
+                <div class="invalid-feedback">يرجى إدخال الصعوبات.</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="tools" class="form-label">الأدوات المتاحة:</label>
+                <textarea class="form-control" id="tools" placeholder="مثال: حاسوب، إنترنت" required></textarea>
+                <div class="invalid-feedback">يرجى إدخال الأدوات.</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="budget" class="form-label">الميزانية المتاحة (بالعملة المحلية):</label>
+                <input type="number" class="form-control" id="budget" placeholder="مثال: 5000" min="0" required>
+                <div class="invalid-feedback">يرجى إدخال الميزانية (0 إذا لم تكن متاحة).</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="timeAvailable" class="form-label">الوقت المتاح (بالأيام):</label>
+                <input type="number" class="form-control" id="timeAvailable" placeholder="مثال: 30" min="1" required>
+                <div class="invalid-feedback">يرجى إدخال الوقت المتاح.</div>
+            </div>
+            
+            <div class="text-center">
+                <button type="button" class="btn btn-primary" onclick="goToResults()">اقترح الحلول</button>
+                <button type="reset" class="btn btn-secondary">مسح</button>
+            </div>
+        </form>
+    </div>
     
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function goToResults() {
+            const form = document.getElementById('decisionForm');
+            if (!form.checkValidity()) {
+                form.classList.add('was-validated');
+                return;
+            }
+            
             const topic = encodeURIComponent(document.getElementById('topic').value);
+            const goals = encodeURIComponent(document.getElementById('goals').value);
             const difficulties = encodeURIComponent(document.getElementById('difficulties').value);
             const tools = encodeURIComponent(document.getElementById('tools').value);
+            const budget = encodeURIComponent(document.getElementById('budget').value);
+            const timeAvailable = encodeURIComponent(document.getElementById('timeAvailable').value);
             
-            // إنشاء رابط للصفحة النتائج مع المدخلات
-            window.location.href = `results.html?topic=${topic}&difficulties=${difficulties}&tools=${tools}`;
+            window.location.href = `results.html?topic=${topic}&goals=${goals}&difficulties=${difficulties}&tools=${tools}&budget=${budget}&time=${timeAvailable}`;
         }
     </script>
 </body>
